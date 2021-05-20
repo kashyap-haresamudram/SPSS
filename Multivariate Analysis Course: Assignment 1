@@ -1,0 +1,68 @@
+COMPUTE Gov_Exp_Edu=GovernmentexpenditureoneducationtotalofGDPSE.XPD.TOTL.GD.ZS.
+EXECUTE.
+COMPUTE Gross_Nat_Exp=GrossnationalexpenditureofGDPNE.DAB.TOTL.ZS.
+EXECUTE.
+COMPUTE RnD_Exp=ResearchanddevelopmentexpenditureofGDPGB.XPD.RSDV.GD.ZS.
+EXECUTE.
+COMPUTE Tax_Rev=TaxrevenueofGDPGC.TAX.TOTL.GD.ZS.
+EXECUTE.
+
+USE ALL.
+COMPUTE filter_$=(Nmiss(Tax_Rev, Gov_Exp_Edu, RnD_Exp, Gross_Nat_Exp) < 0.0001).
+VARIABLE LABELS filter_$ 'Nmiss(Tax_Rev, Gov_Exp_Edu, RnD_Exp, Gross_Nat_Exp) < 0.0001 (FILTER)'.
+VALUE LABELS filter_$ 0 'Not Selected' 1 'Selected'.
+FORMATS filter_$ (f1.0).
+FILTER BY filter_$.
+EXECUTE.
+
+FREQUENCIES VARIABLES=Tax_Rev Gov_Exp_Edu RnD_Exp Gross_Nat_Exp
+  /STATISTICS=STDDEV VARIANCE RANGE MINIMUM MAXIMUM MEAN MEDIAN MODE
+  /HISTOGRAM NORMAL
+  /ORDER=ANALYSIS.
+
+CORRELATIONS
+  /VARIABLES=Tax_Rev Gov_Exp_Edu RnD_Exp Gross_Nat_Exp
+  /PRINT=TWOTAIL NOSIG FULL
+  /MISSING=PAIRWISE.
+
+* Chart Builder.
+GGRAPH
+  /GRAPHDATASET NAME="graphdataset" VARIABLES=Gov_Exp_Edu Tax_Rev MISSING=LISTWISE REPORTMISSING=NO
+  /GRAPHSPEC SOURCE=INLINE
+  /FITLINE TOTAL=NO SUBGROUP=NO.
+BEGIN GPL
+  SOURCE: s=userSource(id("graphdataset"))
+  DATA: Gov_Exp_Edu=col(source(s), name("Gov_Exp_Edu"))
+  DATA: Tax_Rev=col(source(s), name("Tax_Rev"))
+  GUIDE: axis(dim(1), label("Gov_Exp_Edu"))
+  GUIDE: axis(dim(2), label("Tax_Rev"))
+  GUIDE: text.title(label("Scatter Plot of Tax_Rev by Gov_Exp_Edu"))
+  ELEMENT: point(position(Gov_Exp_Edu*Tax_Rev))
+END GPL.
+
+REGRESSION
+  /MISSING LISTWISE
+  /STATISTICS COEFF OUTS R ANOVA COLLIN TOL
+  /CRITERIA=PIN(.05) POUT(.10)
+  /NOORIGIN
+  /DEPENDENT Tax_Rev
+  /METHOD=ENTER Gov_Exp_Edu RnD_Exp Gross_Nat_Exp
+  /SCATTERPLOT=(*ZRESID ,*ZPRED)
+  /RESIDUALS DURBIN NORMPROB(ZRESID)
+  /SAVE COOK.
+
+REGRESSION
+  /MISSING LISTWISE
+  /STATISTICS COEFF OUTS R ANOVA
+  /CRITERIA=PIN(.05) POUT(.10)
+  /NOORIGIN
+  /DEPENDENT Tax_Rev
+  /METHOD=ENTER Gov_Exp_Edu.
+
+REGRESSION
+  /MISSING LISTWISE
+  /STATISTICS COEFF OUTS R ANOVA
+  /CRITERIA=PIN(.05) POUT(.10)
+  /NOORIGIN
+  /DEPENDENT Tax_Rev
+  /METHOD=ENTER Gov_Exp_Edu Gross_Nat_Exp RnD_Exp.
